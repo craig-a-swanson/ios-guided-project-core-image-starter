@@ -12,6 +12,23 @@ class PhotoFilterViewController: UIViewController {
     
     var originalImage: UIImage? {
         didSet {
+            guard let originalImage = originalImage else { return }
+            
+            var scaledSize = imageView.bounds.size
+            let scale = UIScreen.main.scale // could also hard code the size smaller to make it faster
+            
+            scaledSize = CGSize(width: scaledSize.width * scale, height: scaledSize.height * scale)
+            
+            let scaledUIImage = originalImage.imageByScaling(toSize: scaledSize)
+            
+            guard let scaledCGImage = scaledUIImage?.cgImage else { return }
+            
+            scaledImage = CIImage(cgImage: scaledCGImage)
+        }
+    }
+    
+    var scaledImage: CIImage? {
+        didSet {
             updateImage()
         }
     }
@@ -25,26 +42,23 @@ class PhotoFilterViewController: UIViewController {
         originalImage = imageView.image
 	}
     
-    private func image(byFiltering image: UIImage) -> UIImage {
-        // Do something interesting
-        guard let cgImage = image.cgImage else { return image }
-        let inputImage = CIImage(cgImage: cgImage)
+    private func image(byFiltering inputImage: CIImage) -> UIImage {
         
         filter.inputImage = inputImage
         filter.saturation = saturationSlider.value
         filter.brightness = brightnessSlider.value
         filter.contrast = contrastSlider.value
         
-        guard let outputImage = filter.outputImage else { return image }
+        guard let outputImage = filter.outputImage else { return UIImage(ciImage: inputImage) }
         
-        guard let renderedImage = context.createCGImage(outputImage, from: outputImage.extent) else { return image }
+        guard let renderedImage = context.createCGImage(outputImage, from: outputImage.extent) else { return UIImage(ciImage: inputImage) }
         
         return UIImage(cgImage: renderedImage)
     }
     
     private func updateImage() {
-        if let originalImage = originalImage {
-            imageView.image = image(byFiltering: originalImage)
+        if let scaledImage = scaledImage {
+            imageView.image = image(byFiltering: scaledImage)
         } else {
             imageView.image = nil
         }
@@ -69,8 +83,33 @@ class PhotoFilterViewController: UIViewController {
     }
 	
 	@IBAction func savePhotoButtonPressed(_ sender: UIButton) {
-		// TODO: Save to photo library
+		guard let originalImage = originalImage,
+            let cgImage = originalImage.cgImage else { return }
+        
+        let processedImage = self.image(byFiltering: CIImage(cgImage: cgImage))
+        
+        PHPhotoLibrary.requestAuthorization { (status) in
+            guard status == .authorized else { return }
+            
+            PHPhotoLibrary.shared().performChanges({
+                PHAssetCreationRequest.creationRequestForAsset(from: processedImage)
+            }) { (success, error) in
+                if let error = error {
+                    print("Error saving photo: \(error)")
+                    return
+                }
+                DispatchQueue.main.async {
+                    self.presentSuccessfulSaveAlert()
+                }
+            }
+        }
 	}
+    
+    private func presentSuccessfulSaveAlert() {
+        let alert = UIAlertController(title: "Photo Saved!", message: "The photo has been saved to your Photo Library!", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
+        present(alert, animated: true, completion: nil)
+    }
 	
 
 	// MARK: Slider events
