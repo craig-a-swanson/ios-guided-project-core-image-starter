@@ -4,6 +4,14 @@ import CoreImage.CIFilterBuiltins
 import Photos
 
 class PhotoFilterViewController: UIViewController {
+    
+    // 1. Photo is selected and stored in originalImage
+    // 2. Original image scales it down and stores it in scaledImage
+    // 3. The sliders each call updateImage.
+    // 4. updateImage calls the image(byFiltering:) method
+    // 5. The image is adjusted based on the slider values and the output image is set
+    // 6. The output image is returned to updateImage as a UIImage
+    // 7. updateImage sets the UIImageView image to the value of the returned image
 
 	@IBOutlet weak var brightnessSlider: UISlider!
 	@IBOutlet weak var contrastSlider: UISlider!
@@ -72,8 +80,6 @@ class PhotoFilterViewController: UIViewController {
 	// MARK: Actions
 	
 	@IBAction func choosePhotoButtonPressed(_ sender: Any) {
-		// TODO: show the photo picker so we can choose on-device photos
-		// UIImagePickerController + Delegate
         presentImagePickerController()
 	}
     
